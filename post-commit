@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# git-subrepo post-commit hook
+# Split up commits between main and subrepo commits at commit time
+#
+# Copyright (C) Brecht Machiels <brecht@mos6581.org>
+#
+
+debug=1
+subdirs="sub dir1/dir2"
+logfile="/tmp/subrepo.log"
+
+. git-sh-setup
+source "$GIT_DIR/hooks/subrepo"
+
+echo ">$GIT_DIR<" >> $logfile
+
+main()
+{
+    original_commit=$(git rev-parse HEAD)
+    perform_split=false
+    parents="$original_commit^"
+    echo original commit = $original_commit >> $logfile
+ 
+    for subdir in $subdirs; do
+        if has_subrepo_changes $original_commit $subdir; then
+            echo has-subrepo-changes >> $logfile
+            $perform_split || say "Commit has subrepo changes; splitting commit."
+            perform_split=true
+            last_subrepo_commit=$(find_last_subrepo_commit $original_commit^ $subdir)
+            if [[ -z $last_subrepo_commit ]]; then
+                say "No existing subrepo merge commit found in history. Aborting."
+                say "You can split off your subrepo commits like so:"
+                say "   git subtree split --prefix=$subdir -b subtree/$subdir"
+                say "And merge the newly created branch with your main repository:"
+                say "   git merge -s subtree subtree/$subdir" # force path with -Xsubtree= 
+                exit 1
+            fi
+            subrepo_tree=$(subtree_for_commit $original_commit "$subdir")
+            subrepo_commit=$(clone_commit $original_commit $subrepo_tree "$last_subrepo_commit")
+            parents="$parents $subrepo_commit"
+        fi
+    done || exit $?
+
+    if $perform_split; then
+        original_tree=$(toptree_for_commit $original_commit)
+        main_commit=$(clone_commit $original_commit $original_tree "$parents")
+        git reset --quiet $main_commit
+        say "main-line commit $(git rev-parse --short $main_commit) and" 
+        say "$parents"
+        #say "subrepo commit $(git rev-parse --short $subrepo_commit) derived from:"
+    fi
+}
+
+echo "post-commit script"
+main

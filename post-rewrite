@@ -1,0 +1,67 @@
+#!/bin/bash
+#
+# git-subrepo post-merge hook
+#
+# Copyright (C) Brecht Machiels <brecht@mos6581.org>
+#
+
+command="$1"
+
+debug=1
+subdirs="sub dir1/dir2"
+
+. git-sh-setup
+source "$GIT_DIR/hooks/subrepo"
+
+
+main()
+{
+    echo $command
+    cat |
+    while read old_commit new_commit; do
+        echo $old_commit $new_commit
+    done
+    exit
+
+    original_commit=$(git rev-parse HEAD)
+
+    index=1
+    merge_parents=
+    while true; do
+        parent=$(git rev-parse --verify --quiet $original_commit^$index)
+        if [[ $? != 0 ]]; then
+            break
+        fi
+        merge_parents="$merge_parents $parent"
+        index=$(($index + 1))
+    done
+    
+    assert [ $(length $merge_parents) -ge 2 ]
+    echo $merge_parents
+   
+    new_parents=$merge_parents
+    for subdir in $subdirs; do
+        subrepo_parents=
+        for parent in $merge_parents; do
+            subrepo_parent=$(find_last_subrepo_commit $parent "$subdir")
+            subrepo_parents="$subrepo_parents $subrepo_parent"
+        done
+        assert [ -n "$subrepo_parents" ]
+        if [ $(length $subrepo_parents) -ge 2 ]; then
+            subrepo_tree=$(subtree_for_commit $original_commit "$subdir")
+            subrepo_merge_commit=$(clone_commit $original_commit $subrepo_tree "$subrepo_parents")
+        else
+            subrepo_merge_commit=$subrepo_parents
+        fi
+        new_parents="$new_parents $subrepo_merge_commit"
+    done
+    
+    original_tree=$(toptree_for_commit $original_commit)
+    main_commit=$(clone_commit $original_commit $original_tree "$new_parents")
+    git reset --quiet $main_commit
+    say "main-line commit $(git rev-parse --short $main_commit) and" 
+    #say "subrepo commit $(git rev-parse --short $subrepo_commit) derived from:"
+}
+
+echo "post-rewrite"
+main
