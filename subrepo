@@ -6,6 +6,7 @@
 
 require_work_tree
 
+GIT_TOP_LEVEL=$(git rev-parse --show-toplevel)
 
 debug()
 {
@@ -44,7 +45,18 @@ short()
         result="$result $(git rev-parse --short $commit)"
     done
     echo $result
+}
 
+read_subrepo_dirs()
+{
+    dotfile="$GIT_TOP_LEVEL/.gitsubrepos"
+
+    if [ -f $dotfile ]; then
+        cat $dotfile |
+        while read line; do
+            echo "$line"
+        done
+    fi
 }
 
 find_last_subrepo_commit()

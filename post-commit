@@ -7,7 +7,6 @@
 #
 
 debug=1
-subdirs="sub dir1/dir2"
 logfile="$GIT_DIR/logs/subrepo.log"
 
 . git-sh-setup
@@ -16,6 +15,7 @@ source "$GIT_DIR/hooks/subrepo"
 main()
 {
     original_commit=$(git rev-parse HEAD)
+    subdirs=$(read_subrepo_dirs)
     perform_split=false
     parents="$original_commit^"
  
