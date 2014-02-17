@@ -8,23 +8,19 @@
 
 debug=1
 subdirs="sub dir1/dir2"
-logfile="/tmp/subrepo.log"
+logfile="$GIT_DIR/logs/subrepo.log"
 
 . git-sh-setup
 source "$GIT_DIR/hooks/subrepo"
-
-echo ">$GIT_DIR<" >> $logfile
 
 main()
 {
     original_commit=$(git rev-parse HEAD)
     perform_split=false
     parents="$original_commit^"
-    echo original commit = $original_commit >> $logfile
  
     for subdir in $subdirs; do
         if has_subrepo_changes $original_commit $subdir; then
-            echo has-subrepo-changes >> $logfile
             $perform_split || say "Commit has subrepo changes; splitting commit."
             perform_split=true
             last_subrepo_commit=$(find_last_subrepo_commit $original_commit^ $subdir)
