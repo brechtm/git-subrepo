@@ -37,9 +37,14 @@ length()
 
 short()
 {
-    commit=$1
+    commits=$@
+    result=
 
-    git rev-parse --short $commit
+    for commit in $commits; do
+        result="$result $(git rev-parse --short $commit)"
+    done
+    echo $result
+
 }
 
 find_last_subrepo_commit()
@@ -53,6 +58,7 @@ find_last_subrepo_commit()
     while read rev main_parent parents; do
         subrepo_parent=$(get_subrepo_parent "$rev" "$parents" "$subdir")
         if [[ -n $subrepo_parent ]]; then
+            debug "[D] RTRN $FUNCNAME -> $(short $subrepo_parent)"
             echo $subrepo_parent
             break
         fi
@@ -80,7 +86,7 @@ toptree_for_commit()
 {
     commit="$1"
 
-    debug "[D] CALL $FUNCNAME(commit=$(short $commit), subdir='$subdir')"
+    debug "[D] CALL $FUNCNAME(commit=$(short $commit)"
 
     # TODO: replace with plumbing
     git show -s --format=format:%T "$commit" -- || exit $?
@@ -118,7 +124,7 @@ make_parent_args()
     parents=$@
     result=
     
-    debug "[D] CALL $FUNCNAME(parents='$parents')"
+    debug "[D] CALL $FUNCNAME(parents='$(short $parents)')"
 
     for parent in $parents; do
         result="$result -p $parent"
@@ -132,7 +138,7 @@ clone_commit()
     tree="$2"
     parents="$3"
     
-    debug "[D] CALL $FUNCNAME(source_commit=$(short $source_commit), tree=$(short $tree), parents='$parents')"
+    debug "[D] CALL $FUNCNAME(source_commit=$(short $source_commit), tree=$(short $tree), parents='$(short $parents)')"
 
     parent_args=$(make_parent_args $parents)
 
