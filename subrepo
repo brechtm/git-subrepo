@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # git-subrepo common functions
 #
@@ -37,17 +38,21 @@ length()
 }
 
 short()
+# Return abbreviated (but still unique) version for each of the SHA-1 values
+# in $sha1s.
 {
-    commits=$@
+    sha1s=$@
     result=
 
-    for commit in $commits; do
-        result="$result $(git rev-parse --short $commit)"
+    for sha1 in $sha1s; do
+        result="$result $(git rev-parse --short $sha1)"
     done
     echo $result
 }
 
 read_subrepo_dirs()
+# Reads the subrepo directories from .gitsubrepos (one per line) and returns
+# them as a list. If no .gitsubrepos file is found, returns and empty list.
 {
     dotfile="$GIT_TOP_LEVEL/.gitsubrepos"
 
@@ -60,6 +65,7 @@ read_subrepo_dirs()
 }
 
 find_last_subrepo_commit()
+# Return the commit-ish of the last $subdir subrepo commit.
 {
     commit="$1"
     subdir="$2"
@@ -78,14 +84,16 @@ find_last_subrepo_commit()
 }
 
 get_subrepo_parent()
+# Assuming $commit is a subtree merge commit, returns the commit-ish of the
+# parent of $commit that represents the subtree $subdir.
 {
-    rev="$1"
+    commit="$1"
     parents="$2"
     subdir="$3"
 
-    debug "[D] CALL $FUNCNAME(rev=$(short $rev), subdir='$subdir')"
+    debug "[D] CALL $FUNCNAME(commit=$(short $commit), subdir='$subdir')"
     
-    subrepo_tree=$(subtree_for_commit $rev $subdir)
+    subrepo_tree=$(subtree_for_commit $commit $subdir)
     for parent in $parents; do
         parent_tree=$(toptree_for_commit $parent)
         if [[ "$parent_tree" = "$subrepo_tree" ]]; then
@@ -95,6 +103,9 @@ get_subrepo_parent()
 }
 
 toptree_for_commit()
+# Return the tree-ish for the root directory in $commit.
+#
+# (borrowed from git-subtree)
 {
     commit="$1"
 
@@ -105,15 +116,18 @@ toptree_for_commit()
 }
 
 subtree_for_commit()
+# Return the tree-ish for $subdir in $commit.
+#
+# (borrowed from git-subtree)
 {
     commit="$1"
-    dir="$2"
+    subdir="$2"
 
-    debug "[D] CALL $FUNCNAME(commit=$(short $commit), dir='$dir')"
+    debug "[D] CALL $FUNCNAME(commit=$(short $commit), subdir='$subdir')"
 
-    git ls-tree "$commit" -- "$dir" |
+    git ls-tree "$commit" -- "$subdir" |
     while read mode type tree name; do
-        assert [ "$name" = "$dir" ]
+        assert [ "$name" = "$subdir" ]
         assert [ "$type" = "tree" -o "$type" = "commit" ]
         [ "$type" = "commit" ] && continue  # ignore submodules
         echo $tree
@@ -122,6 +136,7 @@ subtree_for_commit()
 }
 
 has_subrepo_changes()
+# Check whether $commit contains changes to files in $subdir.
 {
     commit="$1"
     subdir="$2"
@@ -132,6 +147,11 @@ has_subrepo_changes()
 }
 
 make_parent_args()
+# Takes a list of parent commit-ishes and returns the argument list that can
+# be passed to git-commit-tree.
+#
+# $ make_parent_args 0e4fb0 4e988 c01cbf
+# > -p 0e4fb0 -p 4e988 -p c01cbf
 {
     parents=$@
     result=
@@ -145,6 +165,12 @@ make_parent_args()
 }
 
 clone_commit()
+# Create a new commit consisting of:
+# - the metadata of $source_commit
+# - the directory tree described by the tree-ish $tree
+# - the parents listed in $parents
+#
+# (borrowed from git-subtree)
 {
     source_commit="$1"
     tree="$2"
@@ -164,7 +190,7 @@ clone_commit()
         read GIT_COMMITTER_NAME
         read GIT_COMMITTER_EMAIL
         read GIT_COMMITTER_DATE
-        export  GIT_AUTHOR_NAME \
+        export GIT_AUTHOR_NAME \
             GIT_AUTHOR_EMAIL \
             GIT_AUTHOR_DATE \
             GIT_COMMITTER_NAME \

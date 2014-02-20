@@ -19,6 +19,7 @@ main()
     perform_split=false
     parents="$original_commit^"
  
+    # check for changes in the configured subrepo directories
     for subdir in $subdirs; do
         if has_subrepo_changes $original_commit $subdir; then
             $perform_split || say "Commit has subrepo changes; splitting commit."
@@ -42,11 +43,10 @@ main()
         original_tree=$(toptree_for_commit $original_commit)
         main_commit=$(clone_commit $original_commit $original_tree "$parents")
         git reset --quiet $main_commit
-        say "main-line commit $(git rev-parse --short $main_commit) and" 
-        say "$parents"
+        say "main-line commit $(short $main_commit) and "$(short $parents)"
         #say "subrepo commit $(git rev-parse --short $subrepo_commit) derived from:"
     fi
 }
 
-echo "post-commit script"
+echo "subrepo post-commit script"
 main
