@@ -6,47 +6,47 @@
 # Copyright (C) Brecht Machiels <brecht@mos6581.org>
 #
 
-debug=1
+debug=
 logfile="$GIT_DIR/logs/subrepo.log"
 
 . git-sh-setup
 source "$GIT_DIR/hooks/subrepo"
 
-main()
-{
-    original_commit=$(git rev-parse HEAD)
-    subdirs=$(read_subrepo_dirs)
-    perform_split=false
-    parents="$original_commit^"
- 
-    # check for changes in the configured subrepo directories
-    for subdir in $subdirs; do
-        if has_subrepo_changes $original_commit $subdir; then
-            $perform_split || say "Commit has subrepo changes; splitting commit."
-            perform_split=true
-            last_subrepo_commit=$(find_last_subrepo_commit $original_commit^ $subdir)
-            if [[ -z $last_subrepo_commit ]]; then
-                say "No existing subrepo merge commit found in history. Aborting."
-                say "You can split off your subrepo commits like so:"
-                say "   git subtree split --prefix=$subdir -b subtree/$subdir"
-                say "And merge the newly created branch with your main repository:"
-                say "   git merge -s subtree subtree/$subdir" # force path with -Xsubtree= 
-                exit 1
-            fi
-            subrepo_tree=$(subtree_for_commit $original_commit "$subdir")
-            subrepo_commit=$(clone_commit $original_commit $subrepo_tree "$last_subrepo_commit")
-            parents="$parents $subrepo_commit"
-        fi
-    done || exit $?
-
-    if $perform_split; then
-        original_tree=$(toptree_for_commit $original_commit)
-        main_commit=$(clone_commit $original_commit $original_tree "$parents")
-        git reset --quiet $main_commit
-        say "main-line commit $(short $main_commit) and "$(short $parents)"
-        #say "subrepo commit $(git rev-parse --short $subrepo_commit) derived from:"
-    fi
-}
 
 echo "subrepo post-commit script"
-main
+
+original_commit=$(git rev-parse HEAD)
+subdirs=$(read_subrepo_dirs)
+perform_split=false
+parents="$original_commit^"
+
+# check for changes in the configured subrepo directories
+for subdir in $subdirs; do
+    if has_subrepo_changes $original_commit $subdir; then
+        $perform_split || say "Commit has subrepo changes; splitting commit."
+        perform_split=true
+        last_subrepo_commit=$(find_last_subrepo_commit $original_commit^ $subdir)
+        if [[ -z $last_subrepo_commit ]]; then
+            if [[ -n $(subtree_for_commit $original_commit^ $subdir) ]]; then
+                say "Found changes in '$subdir' in the history. Aborting."
+                say "You probably want to split off your subrepo commits:"
+                say "   git subtree split --prefix=$subdir -b subtree/$subdir"
+                say "and merge the newly created branch with your main repository:"
+                say "   git merge -s subtree subtree/$subdir" # force path with -Xsubtree=
+                exit 1
+            fi
+        fi
+        subrepo_tree=$(subtree_for_commit $original_commit "$subdir")
+        subrepo_commit=$(clone_commit $original_commit $subrepo_tree "$last_subrepo_commit")
+        parents="$parents $subrepo_commit"
+    fi
+done || exit $?
+
+if $perform_split; then
+    original_tree=$(toptree_for_commit $original_commit)
+    main_commit=$(clone_commit $original_commit $original_tree "$parents")
+    git reset --quiet $main_commit
+    #say "main-line commit $(short $main_commit) and \"$(short $parents)\""
+    #say "subrepo commit $(git rev-parse --short $subrepo_commit) derived from:"
+fi
+
